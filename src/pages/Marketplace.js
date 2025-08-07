@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getPrompts, searchPrompts, toggleFavorite } from '../firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 
 const Marketplace = () => {
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [prompts, setPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');

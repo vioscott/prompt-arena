@@ -1,3 +1,4 @@
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase/config';
@@ -31,7 +32,7 @@ import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
-  const [, loading] = useAuthState(auth);
+  const [, loading, authError] = useAuthState(auth);
 
   if (loading) {
     return (
@@ -41,7 +42,7 @@ function App() {
     );
   }
 
-  if (error) {
+  if (authError) {
     return (
       <div className="min-h-screen bg-primary-900 flex items-center justify-center">
         <div className="text-center">
@@ -49,7 +50,7 @@ function App() {
             Authentication Error
           </h1>
           <p className="text-primary-300">
-            {error.message}
+            {authError.message}
           </p>
         </div>
       </div>

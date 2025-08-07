@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 
 const Checkout = () => {
   const { user } = useAuth();
-  const { items, total } = useCart();
+  const { items } = useCart();
   const navigate = useNavigate();
 
   const [clientSecret, setClientSecret] = useState('');
