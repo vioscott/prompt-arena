@@ -5,6 +5,8 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   sendPasswordResetEmail,
   updatePassword,
   EmailAuthProvider,
@@ -88,13 +90,40 @@ export const signInWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    
-    const { user } = await signInWithPopup(auth, provider);
-    await createUserProfile(user);
-    
-    return user;
+
+    // Try popup first, fallback to redirect if COOP issues
+    try {
+      const { user } = await signInWithPopup(auth, provider);
+      await createUserProfile(user);
+      return user;
+    } catch (popupError) {
+      // If popup fails due to COOP or other issues, use redirect
+      if (popupError.code === 'auth/popup-blocked' ||
+          popupError.code === 'auth/popup-closed-by-user' ||
+          popupError.message.includes('Cross-Origin-Opener-Policy')) {
+        console.log('Popup blocked, using redirect method');
+        await signInWithRedirect(auth, provider);
+        return null; // Redirect will handle the rest
+      }
+      throw popupError;
+    }
   } catch (error) {
     console.error('Error signing in with Google:', error);
+    throw error;
+  }
+};
+
+// Handle redirect result (call this on app initialization)
+export const handleGoogleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      await createUserProfile(result.user);
+      return result.user;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error handling redirect result:', error);
     throw error;
   }
 };

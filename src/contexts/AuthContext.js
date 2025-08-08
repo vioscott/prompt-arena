@@ -9,7 +9,8 @@ import {
   signOutUser,
   resetPassword,
   updateUserProfile,
-  changePassword
+  changePassword,
+  handleGoogleRedirectResult
 } from '../firebase/auth';
 
 const AuthContext = createContext();
@@ -26,6 +27,19 @@ export const AuthProvider = ({ children }) => {
   const [user, loading, error] = useAuthState(auth);
   const [userProfile, setUserProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // Handle Google redirect result on app initialization
+  useEffect(() => {
+    const handleRedirect = async () => {
+      try {
+        await handleGoogleRedirectResult();
+      } catch (error) {
+        console.error('Error handling Google redirect:', error);
+      }
+    };
+
+    handleRedirect();
+  }, []);
 
   // Fetch user profile from Firestore
   useEffect(() => {
