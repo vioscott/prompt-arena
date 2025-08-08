@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getPrompts, getUserOrders } from '../firebase/firestore';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Eye, 
+import {
+  DollarSign,
+  TrendingUp,
+  Eye,
   Heart,
   Package,
   Plus,
   Settings,
-  BarChart3
+  BarChart3,
+  ShoppingBag,
+  Download
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -21,10 +23,13 @@ const Dashboard = () => {
     totalEarnings: 0,
     totalSales: 0,
     totalViews: 0,
-    totalPrompts: 0
+    totalPrompts: 0,
+    totalPurchases: 0,
+    totalSpent: 0
   });
   const [recentPrompts, setRecentPrompts] = useState([]);
   const [recentOrders, setRecentOrders] = useState([]);
+  const [purchasedPrompts, setPurchasedPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,16 +49,35 @@ const Dashboard = () => {
           sum + ((prompt.sales || 0) * (prompt.price || 0)), 0
         );
 
+        // Fetch recent orders
+        const orders = await getUserOrders(user.uid);
+        setRecentOrders(orders.slice(0, 5));
+
+        // Get purchased prompts details
+        const completedOrders = orders.filter(order => order.status === 'completed');
+        const purchasedPromptIds = completedOrders.map(order => order.promptId);
+
+        if (purchasedPromptIds.length > 0) {
+          // Fetch details of purchased prompts
+          const { prompts: purchased } = await getPrompts({}, null, 50);
+          const userPurchasedPrompts = purchased.filter(prompt =>
+            purchasedPromptIds.includes(prompt.id)
+          );
+          setPurchasedPrompts(userPurchasedPrompts.slice(0, 5));
+        }
+
+        // Calculate buyer stats from orders
+        const totalPurchases = completedOrders.length;
+        const totalSpent = completedOrders.reduce((sum, order) => sum + (order.amount || 0), 0);
+
         setStats({
           totalEarnings,
           totalSales,
           totalViews,
-          totalPrompts: prompts.length
+          totalPrompts: prompts.length,
+          totalPurchases,
+          totalSpent
         });
-
-        // Fetch recent orders
-        const orders = await getUserOrders(user.uid);
-        setRecentOrders(orders.slice(0, 5));
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -77,6 +101,18 @@ const Dashboard = () => {
       value: stats.totalSales,
       icon: <TrendingUp className="h-6 w-6" />,
       color: 'text-secondary-400'
+    },
+    {
+      title: 'Purchases Made',
+      value: stats.totalPurchases,
+      icon: <ShoppingBag className="h-6 w-6" />,
+      color: 'text-accent-500'
+    },
+    {
+      title: 'Total Spent',
+      value: `$${stats.totalSpent.toFixed(2)}`,
+      icon: <Heart className="h-6 w-6" />,
+      color: 'text-red-400'
     },
     {
       title: 'Total Views',
@@ -267,6 +303,80 @@ const Dashboard = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* My Purchased Prompts */}
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-primary-50">
+              My Purchased Prompts
+            </h2>
+            <Link to="/orders">
+              <Button variant="ghost" size="sm">
+                View All Orders
+              </Button>
+            </Link>
+          </div>
+
+          {purchasedPrompts.length === 0 ? (
+            <div className="card p-8 text-center">
+              <ShoppingBag size={48} className="mx-auto text-primary-600 mb-4" />
+              <h3 className="text-lg font-medium text-primary-50 mb-2">
+                No purchased prompts yet
+              </h3>
+              <p className="text-primary-300 mb-4">
+                Purchase prompts from the marketplace to access them here
+              </p>
+              <Link to="/marketplace">
+                <Button>
+                  Browse Marketplace
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {purchasedPrompts.map((prompt) => (
+                <div key={prompt.id} className="card p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-primary-50 mb-2 line-clamp-2">
+                        {prompt.title}
+                      </h3>
+                      <p className="text-primary-300 text-sm mb-3 line-clamp-2">
+                        {prompt.description}
+                      </p>
+                      <div className="flex items-center space-x-2 text-xs">
+                        <span className="px-2 py-1 bg-accent-500/20 text-accent-400 rounded-full">
+                          {prompt.aiTool}
+                        </span>
+                        <span className="px-2 py-1 bg-primary-600 text-primary-300 rounded-full">
+                          {prompt.category}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-primary-400">
+                      Purchased
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Link to={`/prompt/${prompt.id}`}>
+                        <Button size="sm" variant="outline">
+                          <Eye size={14} className="mr-1" />
+                          View
+                        </Button>
+                      </Link>
+                      <Button size="sm">
+                        <Download size={14} className="mr-1" />
+                        Use
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}

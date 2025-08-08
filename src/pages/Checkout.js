@@ -7,6 +7,7 @@ import { getStripe, createPaymentIntent } from '../utils/stripe';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
 import Button from '../components/ui/Button';
 import CheckoutForm from '../components/payment/CheckoutForm';
+import MockCheckoutForm from '../components/payment/MockCheckoutForm';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Link } from 'react-router-dom';
 
@@ -38,8 +39,13 @@ const Checkout = () => {
     const initializePayment = async () => {
       setLoading(true);
       try {
-        const { clientSecret } = await createPaymentIntent(items, user.uid);
-        setClientSecret(clientSecret);
+        if (process.env.NODE_ENV === 'development') {
+          // In development, we don't need a real client secret
+          setClientSecret('dev_mode');
+        } else {
+          const { clientSecret } = await createPaymentIntent(items, user.uid);
+          setClientSecret(clientSecret);
+        }
       } catch (err) {
         console.error('Error initializing payment:', err);
         setError('Failed to initialize payment. Please try again.');
@@ -139,14 +145,23 @@ const Checkout = () => {
 
         {/* Checkout Form */}
         <div className="card p-6">
-          {clientSecret && stripePromise && (
-            <Elements options={options} stripe={stripePromise}>
-              <CheckoutForm
-                clientSecret={clientSecret}
-                onSuccess={handlePaymentSuccess}
-                onError={handlePaymentError}
-              />
-            </Elements>
+          {process.env.NODE_ENV === 'development' ? (
+            // Development mode - use mock checkout form
+            <MockCheckoutForm
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+            />
+          ) : (
+            // Production mode - use Stripe Elements
+            clientSecret && stripePromise && (
+              <Elements options={options} stripe={stripePromise}>
+                <CheckoutForm
+                  clientSecret={clientSecret}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                />
+              </Elements>
+            )
           )}
         </div>
 

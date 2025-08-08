@@ -8,6 +8,21 @@ export const getStripe = () => stripePromise;
 // Create payment intent for checkout
 export const createPaymentIntent = async (items, userId) => {
   try {
+    // For development, simulate payment intent creation
+    if (process.env.NODE_ENV === 'development') {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Return mock client secret with proper Stripe format
+      const mockId = `pi_3${Math.random().toString(36).substr(2, 24)}`;
+      const mockSecret = Math.random().toString(36).substr(2, 24);
+      return {
+        clientSecret: `${mockId}_secret_${mockSecret}`,
+        paymentIntentId: mockId
+      };
+    }
+
+    // Production API call
     const response = await fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: {
@@ -34,6 +49,20 @@ export const createPaymentIntent = async (items, userId) => {
 // Process payment
 export const processPayment = async (stripe, elements, clientSecret) => {
   try {
+    // For development with mock client secret, simulate successful payment
+    if (process.env.NODE_ENV === 'development' && clientSecret.startsWith('pi_3')) {
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      return {
+        id: `pi_mock_${Date.now()}`,
+        status: 'succeeded',
+        amount: 1000, // Mock amount
+        currency: 'usd'
+      };
+    }
+
+    // Real Stripe payment processing
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {

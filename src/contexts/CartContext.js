@@ -58,41 +58,49 @@ export const CartProvider = ({ children }) => {
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const { user } = useAuth();
 
-  // Load cart from localStorage on mount
+  // Load cart from localStorage when user changes
   useEffect(() => {
-    const savedCart = localStorage.getItem('prompt_arena_cart');
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        dispatch({ type: 'LOAD_CART', payload: parsedCart });
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
+    if (user) {
+      // Load user-specific cart
+      const savedCart = localStorage.getItem(`cart_${user.uid}`);
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          dispatch({ type: 'LOAD_CART', payload: parsedCart });
+        } catch (error) {
+          console.error('Error loading cart from localStorage:', error);
+        }
       }
-    }
-  }, []);
-
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('prompt_arena_cart', JSON.stringify(state));
-  }, [state]);
-
-  // Clear cart when user logs out
-  useEffect(() => {
-    if (!user) {
-      dispatch({ type: 'CLEAR_CART' });
+    } else {
+      // Load guest cart
+      const savedCart = localStorage.getItem('cart_guest');
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          dispatch({ type: 'LOAD_CART', payload: parsedCart });
+        } catch (error) {
+          console.error('Error loading guest cart from localStorage:', error);
+        }
+      }
     }
   }, [user]);
 
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    const cartKey = user ? `cart_${user.uid}` : 'cart_guest';
+    localStorage.setItem(cartKey, JSON.stringify(state));
+  }, [state, user]);
+
   const addItem = (item) => {
-    dispatch({ type: 'ADD_ITEM', payload: item });
+    dispatch({ type: 'ADD_ITEM', payload: item, userId: user?.uid });
   };
 
   const removeItem = (itemId) => {
-    dispatch({ type: 'REMOVE_ITEM', payload: itemId });
+    dispatch({ type: 'REMOVE_ITEM', payload: { id: itemId }, userId: user?.uid });
   };
 
   const clearCart = () => {
-    dispatch({ type: 'CLEAR_CART' });
+    dispatch({ type: 'CLEAR_CART', userId: user?.uid });
   };
 
   const isInCart = (itemId) => {

@@ -18,6 +18,13 @@ const CheckoutForm = ({ clientSecret, onSuccess, onError }) => {
   const [paymentReady, setPaymentReady] = useState(false);
 
   useEffect(() => {
+    // For development mode, always ready
+    if (process.env.NODE_ENV === 'development') {
+      setPaymentReady(true);
+      return;
+    }
+
+    // For production, need stripe and elements
     if (!stripe || !elements) {
       return;
     }
@@ -27,12 +34,17 @@ const CheckoutForm = ({ clientSecret, onSuccess, onError }) => {
     if (paymentElement) {
       setPaymentReady(true);
     }
-  }, [stripe, elements]);
+  }, [stripe, elements, clientSecret]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!stripe || !elements || !user) {
+    if (!user) {
+      return;
+    }
+
+    // In development, we don't need stripe or elements
+    if (process.env.NODE_ENV === 'production' && (!stripe || !elements)) {
       return;
     }
 
@@ -40,17 +52,34 @@ const CheckoutForm = ({ clientSecret, onSuccess, onError }) => {
     setError(null);
 
     try {
-      // Confirm payment
-      const { error: paymentError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/orders`,
-        },
-        redirect: 'if_required'
-      });
+      let paymentIntent;
 
-      if (paymentError) {
-        throw paymentError;
+      // Handle mock payments for development
+      if (process.env.NODE_ENV === 'development') {
+        // Simulate payment processing
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        paymentIntent = {
+          id: `pi_mock_${Date.now()}`,
+          status: 'succeeded',
+          amount: Math.round(total * 100),
+          currency: 'usd'
+        };
+      } else {
+        // Real Stripe payment processing
+        const { error: paymentError, paymentIntent: realPaymentIntent } = await stripe.confirmPayment({
+          elements,
+          confirmParams: {
+            return_url: `${window.location.origin}/orders`,
+          },
+          redirect: 'if_required'
+        });
+
+        if (paymentError) {
+          throw paymentError;
+        }
+
+        paymentIntent = realPaymentIntent;
       }
 
       if (paymentIntent.status === 'succeeded') {
@@ -100,6 +129,14 @@ const CheckoutForm = ({ clientSecret, onSuccess, onError }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Development Notice */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="flex items-center space-x-2 text-sm text-yellow-300 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
+          <AlertCircle size={16} className="text-yellow-400" />
+          <span>Development Mode: This is a simulated payment for testing purposes</span>
+        </div>
+      )}
+
       {/* Security Notice */}
       <div className="flex items-center space-x-2 text-sm text-primary-300 bg-primary-800/50 p-3 rounded-lg">
         <Lock size={16} className="text-green-400" />
@@ -114,19 +151,29 @@ const CheckoutForm = ({ clientSecret, onSuccess, onError }) => {
         </h3>
         
         <div className="p-4 border border-primary-600 rounded-lg bg-primary-800">
-          <PaymentElement
-            options={{
-              style: {
-                base: {
-                  fontSize: '16px',
-                  color: '#f8f9fa',
-                  '::placeholder': {
-                    color: '#6c757d',
+          {process.env.NODE_ENV === 'development' ? (
+            <div className="text-center py-8">
+              <CreditCard size={32} className="mx-auto text-primary-400 mb-4" />
+              <p className="text-primary-300 mb-2">Development Mode</p>
+              <p className="text-primary-400 text-sm">
+                Click "Pay" below to simulate a successful payment
+              </p>
+            </div>
+          ) : (
+            <PaymentElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#f8f9fa',
+                    '::placeholder': {
+                      color: '#6c757d',
+                    },
                   },
                 },
-              },
-            }}
-          />
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -164,7 +211,12 @@ const CheckoutForm = ({ clientSecret, onSuccess, onError }) => {
         loading={loading}
         disabled={loading || !paymentReady}
       >
-        {loading ? 'Processing...' : `Pay $${total.toFixed(2)}`}
+        {loading
+          ? 'Processing...'
+          : process.env.NODE_ENV === 'development'
+            ? `Simulate Payment - $${total.toFixed(2)}`
+            : `Pay $${total.toFixed(2)}`
+        }
       </Button>
 
       {/* Terms */}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from './firebase/config';
+import { Toaster } from 'react-hot-toast';
 
 // Context Providers
 import { AuthProvider } from './contexts/AuthContext';
@@ -25,6 +26,7 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
+import Favorites from './pages/Favorites';
 import DevTools from './pages/DevTools';
 import NotFound from './pages/NotFound';
 
@@ -61,6 +63,29 @@ function App() {
     <AuthProvider>
       <CartProvider>
         <div className="min-h-screen bg-primary-900 flex flex-col">
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#1e293b',
+                color: '#f1f5f9',
+                border: '1px solid #334155',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#0ea5e9',
+                  secondary: '#f1f5f9',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#f1f5f9',
+                },
+              },
+            }}
+          />
           <Navbar />
           
           <main className="flex-1">
@@ -100,6 +125,12 @@ function App() {
               <Route path="/orders" element={
                 <ProtectedRoute>
                   <Orders />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/favorites" element={
+                <ProtectedRoute>
+                  <Favorites />
                 </ProtectedRoute>
               } />
 

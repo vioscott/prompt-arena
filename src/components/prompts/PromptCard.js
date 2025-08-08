@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
+import { toggleFavorite, isPromptFavorited } from '../../firebase/firestore';
 import { Heart, Star, Eye, ShoppingCart, User } from 'lucide-react';
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
@@ -9,6 +10,27 @@ import toast from 'react-hot-toast';
 const PromptCard = ({ prompt, onFavorite }) => {
   const { user } = useAuth();
   const { addItem, isInCart } = useCart();
+  const [isFavorited, setIsFavorited] = useState(prompt.isFavorited || false);
+  const [favoriteCount, setFavoriteCount] = useState(prompt.favorites || 0);
+  const [loading, setLoading] = useState(false);
+
+  // Check if prompt is favorited when user changes
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (user && prompt.id) {
+        try {
+          const favorited = await isPromptFavorited(user.uid, prompt.id);
+          setIsFavorited(favorited);
+        } catch (error) {
+          console.error('Error checking favorite status:', error);
+        }
+      } else {
+        setIsFavorited(false);
+      }
+    };
+
+    checkFavoriteStatus();
+  }, [user, prompt.id]);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -35,17 +57,36 @@ const PromptCard = ({ prompt, onFavorite }) => {
     toast.success('Added to cart!');
   };
 
-  const handleFavorite = (e) => {
+  const handleFavorite = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!user) {
       toast.error('Please sign in to favorite prompts');
       return;
     }
 
-    if (onFavorite) {
-      onFavorite(prompt.id);
+    if (loading) return;
+
+    setLoading(true);
+    try {
+      const newFavoriteStatus = await toggleFavorite(user.uid, prompt.id);
+      setIsFavorited(newFavoriteStatus);
+
+      // Update favorite count
+      setFavoriteCount(prev => newFavoriteStatus ? prev + 1 : prev - 1);
+
+      // Call parent callback if provided
+      if (onFavorite) {
+        onFavorite(prompt.id, newFavoriteStatus);
+      }
+
+      toast.success(newFavoriteStatus ? 'Added to favorites!' : 'Removed from favorites');
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,9 +125,10 @@ const PromptCard = ({ prompt, onFavorite }) => {
           {/* Favorite Button */}
           <button
             onClick={handleFavorite}
-            className="absolute top-3 right-3 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+            disabled={loading}
+            className={`absolute top-3 right-3 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <Heart size={16} className={prompt.isFavorited ? 'fill-red-500 text-red-500' : ''} />
+            <Heart size={16} className={isFavorited ? 'fill-red-500 text-red-500' : ''} />
           </button>
 
           {/* AI Tool Badge */}
@@ -135,7 +177,7 @@ const PromptCard = ({ prompt, onFavorite }) => {
               </div>
               <div className="flex items-center">
                 <Heart size={14} className="mr-1" />
-                <span>{prompt.favorites || 0}</span>
+                <span>{favoriteCount}</span>
               </div>
               {prompt.rating > 0 && (
                 <div className="flex items-center text-yellow-400">

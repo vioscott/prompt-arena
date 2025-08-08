@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getPrompts, searchPrompts, toggleFavorite } from '../firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { getPrompts, searchPrompts } from '../firebase/firestore';
 import { Grid, List, Search } from 'lucide-react';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import PromptCard from '../components/prompts/PromptCard';
 import SearchFilters from '../components/marketplace/SearchFilters';
-import toast from 'react-hot-toast';
+
 
 const Marketplace = () => {
-  const { user } = useAuth();
+
   const [searchParams] = useSearchParams();
   const [prompts, setPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,26 +24,15 @@ const Marketplace = () => {
 
   const searchQuery = searchParams.get('search') || '';
 
-  const handleFavorite = async (promptId) => {
-    if (!user) {
-      toast.error('Please sign in to favorite prompts');
-      return;
-    }
-
-    try {
-      const isFavorited = await toggleFavorite(user.uid, promptId);
-
-      // Update the prompt in the local state
+  const handleFavorite = async (promptId, isFavorited) => {
+    // This function is now handled by PromptCard itself
+    // We can optionally update local state here if needed
+    if (isFavorited !== undefined) {
       setPrompts(prev => prev.map(prompt =>
         prompt.id === promptId
           ? { ...prompt, isFavorited, favorites: (prompt.favorites || 0) + (isFavorited ? 1 : -1) }
           : prompt
       ));
-
-      toast.success(isFavorited ? 'Added to favorites' : 'Removed from favorites');
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-      toast.error('Failed to update favorite');
     }
   };
 

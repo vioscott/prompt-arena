@@ -12,10 +12,9 @@ import {
   limit,
   startAfter,
   increment,
-  arrayUnion,
-  arrayRemove,
   serverTimestamp,
-  onSnapshot
+  onSnapshot,
+  documentId
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -54,7 +53,7 @@ export const getPrompt = async (promptId) => {
   try {
     const docRef = doc(db, COLLECTIONS.PROMPTS, promptId);
     const docSnap = await getDoc(docRef);
-    
+
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() };
     } else {
@@ -62,6 +61,84 @@ export const getPrompt = async (promptId) => {
     }
   } catch (error) {
     console.error('Error getting prompt:', error);
+    throw error;
+  }
+};
+
+// Alias for getPrompt - used in PromptDetail
+export const getPromptById = getPrompt;
+
+// Get user orders
+export const getUserOrders = async (userId) => {
+  try {
+    const ordersRef = collection(db, COLLECTIONS.ORDERS);
+    const q = query(
+      ordersRef,
+      where('buyerId', '==', userId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    let orders = [];
+
+    querySnapshot.forEach((doc) => {
+      orders.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Sort client-side to avoid index requirement
+    orders.sort((a, b) => {
+      const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+      const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+      return bTime - aTime; // Descending order
+    });
+
+    return orders;
+  } catch (error) {
+    console.error('Error getting user orders:', error);
+    throw error;
+  }
+};
+
+// Get user favorites
+export const getUserFavorites = async (userId) => {
+  try {
+    // Get user's favorite prompt IDs
+    const favoritesRef = collection(db, COLLECTIONS.FAVORITES);
+    const q = query(favoritesRef, where('userId', '==', userId));
+
+    const querySnapshot = await getDocs(q);
+    const favoritePromptIds = [];
+
+    querySnapshot.forEach((doc) => {
+      favoritePromptIds.push(doc.data().promptId);
+    });
+
+    if (favoritePromptIds.length === 0) {
+      return [];
+    }
+
+    // Get the actual prompt documents
+    // Note: Firestore 'in' queries are limited to 10 items
+    const favoritePrompts = [];
+    const batchSize = 10;
+
+    for (let i = 0; i < favoritePromptIds.length; i += batchSize) {
+      const batch = favoritePromptIds.slice(i, i + batchSize);
+      const promptsRef = collection(db, COLLECTIONS.PROMPTS);
+      const promptsQuery = query(
+        promptsRef,
+        where(documentId(), 'in', batch),
+        where('status', '==', 'approved')
+      );
+
+      const promptsSnapshot = await getDocs(promptsQuery);
+      promptsSnapshot.forEach((doc) => {
+        favoritePrompts.push({ id: doc.id, ...doc.data(), isFavorited: true });
+      });
+    }
+
+    return favoritePrompts;
+  } catch (error) {
+    console.error('Error getting user favorites:', error);
     throw error;
   }
 };
@@ -185,35 +262,67 @@ export const incrementPromptViews = async (promptId) => {
 // Favorites
 export const toggleFavorite = async (userId, promptId) => {
   try {
-    const userRef = doc(db, COLLECTIONS.USERS, userId);
+    const favoritesRef = collection(db, COLLECTIONS.FAVORITES);
     const promptRef = doc(db, COLLECTIONS.PROMPTS, promptId);
-    
+
     // Check if already favorited
-    const userDoc = await getDoc(userRef);
-    const favorites = userDoc.data()?.favorites || [];
-    
-    if (favorites.includes(promptId)) {
+    const q = query(
+      favoritesRef,
+      where('userId', '==', userId),
+      where('promptId', '==', promptId)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
       // Remove from favorites
-      await updateDoc(userRef, {
-        favorites: arrayRemove(promptId)
-      });
+      const favoriteDoc = querySnapshot.docs[0];
+      await deleteDoc(doc(db, COLLECTIONS.FAVORITES, favoriteDoc.id));
+
+      // Decrement favorite count on prompt
       await updateDoc(promptRef, {
         favorites: increment(-1)
       });
+
       return false;
     } else {
       // Add to favorites
-      await updateDoc(userRef, {
-        favorites: arrayUnion(promptId)
+      await addDoc(favoritesRef, {
+        userId,
+        promptId,
+        createdAt: serverTimestamp()
       });
+
+      // Increment favorite count on prompt
       await updateDoc(promptRef, {
         favorites: increment(1)
       });
+
       return true;
     }
   } catch (error) {
     console.error('Error toggling favorite:', error);
     throw error;
+  }
+};
+
+// Check if prompt is favorited by user
+export const isPromptFavorited = async (userId, promptId) => {
+  try {
+    if (!userId || !promptId) return false;
+
+    const favoritesRef = collection(db, COLLECTIONS.FAVORITES);
+    const q = query(
+      favoritesRef,
+      where('userId', '==', userId),
+      where('promptId', '==', promptId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking if prompt is favorited:', error);
+    return false;
   }
 };
 
@@ -279,28 +388,6 @@ export const createOrder = async (orderData) => {
     return docRef.id;
   } catch (error) {
     console.error('Error creating order:', error);
-    throw error;
-  }
-};
-
-export const getUserOrders = async (userId) => {
-  try {
-    const q = query(
-      collection(db, COLLECTIONS.ORDERS),
-      where('buyerId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const orders = [];
-    
-    querySnapshot.forEach((doc) => {
-      orders.push({ id: doc.id, ...doc.data() });
-    });
-    
-    return orders;
-  } catch (error) {
-    console.error('Error getting user orders:', error);
     throw error;
   }
 };
