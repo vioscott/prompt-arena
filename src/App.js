@@ -28,6 +28,7 @@ import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
 import Favorites from './pages/Favorites';
 import DevTools from './pages/DevTools';
+import SeedData from './pages/SeedData';
 import NotFound from './pages/NotFound';
 
 // Protected Route Component
@@ -138,6 +139,9 @@ function App() {
               {process.env.NODE_ENV === 'development' && (
                 <Route path="/dev-tools" element={<DevTools />} />
               )}
+
+              {/* Seed Data Tool - Temporary for deployment */}
+              <Route path="/seed-data" element={<SeedData />} />
 
               {/* 404 Route */}
               <Route path="*" element={<NotFound />} />
