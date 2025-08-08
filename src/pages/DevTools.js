@@ -45,7 +45,7 @@ const DevTools = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-400">Project ID:</span>
-                <span className="text-primary-300">prompt-arena-c4143</span>
+                <span className="text-primary-300">{process.env.REACT_APP_FIREBASE_PROJECT_ID || 'Not configured'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-400">Region:</span>
